@@ -1,6 +1,7 @@
 package org.samo_lego.antilogout.mixin;
 
 import com.mojang.authlib.GameProfile;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
@@ -13,6 +14,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 
+import java.net.SocketAddress;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,23 +35,20 @@ public class MPlayerList {
      *
      * @param gameProfile
      * @param cir
-     * @param uUID
-     * @param matchingPlayers
-     * @param serverPlayer2
      */
-    @Inject(method = "getPlayerForLogin",
-            at = @At(value = "INVOKE",
-                    target = "Ljava/util/List;iterator()Ljava/util/Iterator;"),
+    @Inject(method = "canPlayerLogin",
+            at = @At("RETURN"),
             locals = LocalCapture.CAPTURE_FAILHARD)
-    private void onPlayerLogin(GameProfile gameProfile, CallbackInfoReturnable<ServerPlayer> cir, UUID uUID, List<ServerPlayer> matchingPlayers, ServerPlayer serverPlayer2) {
-        for (ServerPlayer player : matchingPlayers) {
-            // Allows disconnect
-            ((ILogoutRules) player).al_setAllowDisconnect(true);
+    private void onPlayerLogin(SocketAddress socketAddress, GameProfile gameProfile, CallbackInfoReturnable<Component> cir) {
+        ServerPlayer player = server.getPlayerList().getPlayer(gameProfile.getId());
+        if (player == null)
+            return;
 
-            // Removes player so that the internal finite state machine in ServerLoginPacketListenerImpl can continue
-            this.server.getPlayerList().remove(player);
+        // Allows disconnect
+        ((ILogoutRules) player).al_setAllowDisconnect(true);
 
-            ILogoutRules.DISCONNECTED_PLAYERS.remove(player);
-        }
+        // Removes player so that the internal finite state machine in ServerLoginPacketListenerImpl can continue
+        this.server.getPlayerList().remove(player);
+        ILogoutRules.DISCONNECTED_PLAYERS.remove(player);
     }
 }
